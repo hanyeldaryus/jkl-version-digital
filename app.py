@@ -41,7 +41,7 @@ app = Flask(__name__)
 def wajib_env(nama):
     nilai = os.environ.get(nama)
     if not nilai:
-        raise RuntimeError(f"Environment variable {nama} belum diatur. Lihat .env.example")
+        raise RuntimeError(f"did not get env {nama}")
     return nilai
 
 
@@ -62,7 +62,6 @@ app.config.update(
     SECRET_KEY=wajib_env("SECRET_KEY"),
     SQLALCHEMY_DATABASE_URI=database_url(),
     SQLALCHEMY_ENGINE_OPTIONS={"pool_pre_ping": True},
-    # Dipertahankan untuk kompatibilitas lokal; dokumen produksi disimpan di DB.
     UPLOAD_FOLDER=os.path.join(BASE, "uploads"),
     MAX_CONTENT_LENGTH=4 * 1024 * 1024,
     SESSION_COOKIE_HTTPONLY=True,
@@ -72,7 +71,7 @@ app.config.update(
     REMEMBER_COOKIE_SECURE=PROD,
     PERMANENT_SESSION_LIFETIME=timedelta(minutes=30),
 )
-if os.environ.get("TRUST_PROXY") == "1":  # di belakang reverse proxy/load balancer
+if os.environ.get("TRUST_PROXY") == "1":
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 Talisman(app, force_https=PROD, strict_transport_security=PROD, session_cookie_secure=PROD,
          frame_options="DENY", referrer_policy="no-referrer",
@@ -88,8 +87,6 @@ login_manager.login_view = "login"
 login_manager.session_protection = "strong"
 cipher = Fernet(wajib_env("ENCRYPTION_KEY"))
 
-# Vercel/serverless tidak cocok untuk file log lokal yang persisten.
-# StreamHandler membuat audit masuk ke runtime logs Vercel dan tetap bisa dipakai lokal.
 _h = logging.StreamHandler()
 _h.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
 audit_log = logging.getLogger("audit")
@@ -126,11 +123,10 @@ MIME = {"pdf": "application/pdf", "png": "image/png", "jpg": "image/jpeg", "jpeg
 DUMMY_HASH = generate_password_hash("dummy-untuk-timing")
 
 
-# ---- Konfigurasi domain -------------------------------------------------
 STATUS = ["Diajukan", "Disetujui", "Dokumen dicetak", "Sudah TTD", "Dicairkan", "Ditolak"]
 ROLES = {"dealer": "Sales Dealer", "marketing": "Marketing",
          "atasan": "Atasan Marketing", "backoffice": "Admin Backoffice"}
-TRANSISI = {  # role -> {status sekarang: [status tujuan]}
+TRANSISI = { 
     "atasan": {"Diajukan": ["Disetujui", "Ditolak"]},
     "backoffice": {"Disetujui": ["Dokumen dicetak"], "Dokumen dicetak": ["Sudah TTD"],
                    "Sudah TTD": ["Dicairkan"]},
@@ -140,11 +136,10 @@ LABEL_AKSI = {"Disetujui": "Setujui", "Ditolak": "Tolak", "Dokumen dicetak": "Bu
 JENIS_DOK = {"ktp": "KTP", "tanda_jadi": "Bukti bayar tanda jadi",
              "form_aplikasi": "Form aplikasi pengajuan", "kk": "Kartu keluarga", "ttd": "Dokumen TTD"}
 DOK_WAJIB = ("ktp", "tanda_jadi", "form_aplikasi", "kk")
-BUNGA_FLAT = 10  # persen per tahun (asumsi)
+BUNGA_FLAT = 10  
 EXT = {"pdf", "png", "jpg", "jpeg"}
 
 
-# ---- Model --------------------------------------------------------------
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
@@ -208,8 +203,6 @@ class Riwayat(db.Model):
 def load_user(uid):
     return db.session.get(User, int(uid))
 
-
-# ---- Helper -------------------------------------------------------------
 @app.template_filter("rp")
 def rp(n):
     return "Rp{:,.0f}".format(n or 0).replace(",", ".")
@@ -281,7 +274,7 @@ def ambil(id):
     p = db.get_or_404(Pengajuan, id)
     if current_user.role in OWN_ONLY and p.created_by != current_user.id:
         audit("akses_record_ditolak", id=id)
-        abort(404)  # 404 agar keberadaan record tidak bisa ditebak
+        abort(404)  
     return p
 
 
@@ -323,7 +316,6 @@ def validasi(f, files):
     return e
 
 
-# ---- Route --------------------------------------------------------------
 @app.get("/health")
 def health():
     return {"status": "ok"}, 200
@@ -359,15 +351,15 @@ for _kode, _pesan in ((400, "Permintaan tidak valid."), (404, "Data tidak ditemu
 @limiter.limit("5 per minute; 30 per hour", methods=["POST"])
 def login():
     if request.method == "POST":
-        if request.form.get("website"):  # honeypot: manusia tidak melihat field ini
+        if request.form.get("website"): 
             audit("bot_terdeteksi")
             abort(400)
         username = request.form.get("username", "").strip()[:50]
         u = User.query.filter_by(username=username).first()
-        # selalu verifikasi hash agar waktu respons tidak membocorkan username valid
+
         ok = check_password_hash(u.password_hash if u else DUMMY_HASH, request.form.get("password", "")[:200])
         if u and ok:
-            session.clear()  # cegah session fixation
+            session.clear() 
             login_user(u)
             session.permanent = True
             audit("login_sukses")
@@ -456,7 +448,6 @@ def aksi(id):
             flash("Unggah dokumen TTD dalam format PDF/JPG/PNG yang valid.", "danger")
             return redirect(url_for("detail", id=id))
         simpan_file(fl, "ttd", p)
-    # kunci optimistis: hanya berhasil jika status belum diubah pengguna lain
     dikunci = Pengajuan.query.filter_by(id=id, status=p.status).update({"status": target})
     if dikunci != 1:
         db.session.rollback()
@@ -473,11 +464,10 @@ def aksi(id):
 @login_required
 def dokumen(id):
     d = db.get_or_404(Dokumen, id)
-    ambil(d.pengajuan_id)  # cek kepemilikan record induk
+    ambil(d.pengajuan_id) 
     if d.data:
         data = cipher.decrypt(bytes(d.data))
     else:
-        # Fallback untuk database lokal versi lama yang masih memakai uploads/.
         path = os.path.join(app.config["UPLOAD_FOLDER"], os.path.basename(d.file))
         if not os.path.exists(path):
             abort(404)
@@ -573,7 +563,6 @@ def pengajuan_pdf(id):
 
 @app.cli.command("seed")
 def seed():
-    """Buat tabel dan akun awal. Password acak hanya tampil sekali; simpan di password manager."""
     db.create_all()
     for u, n, r in (("dealer1", "Budi (Sales Dealer)", "dealer"), ("marketing1", "Sari (Marketing)", "marketing"),
                     ("atasan1", "Andi (Atasan Marketing)", "atasan"), ("backoffice1", "Rina (Admin Backoffice)", "backoffice")):
