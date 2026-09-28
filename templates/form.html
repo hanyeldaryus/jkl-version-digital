@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Pengajuan baru{% endblock %}
+{% macro inp(name, label, type='text', col=6, extra='') %}
+<div class="col-md-{{ col }}"><label class="form-label">{{ label }}</label>
+  <input class="form-control" name="{{ name }}" type="{{ type }}" {% if type != 'file' %}value="{{ f.get(name, '') }}"{% else %}accept=".pdf,.png,.jpg,.jpeg"{% endif %} {{ extra }}></div>
+{% endmacro %}
+{% block content %}
+<h1 class="h4 mb-3">Pengajuan kredit baru</h1>
+<form method="post" enctype="multipart/form-data" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input class="d-none" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+  <div class="card mb-3"><div class="card-header">Data konsumen</div><div class="card-body row g-3">
+    {{ inp('nama', 'Nama lengkap') }}{{ inp('nik', 'NIK (16 digit)', extra='maxlength=16 inputmode=numeric') }}
+    {{ inp('tgl_lahir', 'Tanggal lahir', 'date', 4) }}
+    <div class="col-md-4"><label class="form-label">Status perkawinan</label>
+      <select class="form-select" name="status_kawin">
+        {% for s in ('Belum kawin', 'Kawin', 'Cerai') %}<option {{ 'selected' if f.get('status_kawin') == s }}>{{ s }}</option>{% endfor %}
+      </select></div>
+    <div class="col-md-4"></div>
+    {{ inp('nama_pasangan', 'Nama pasangan (jika kawin)') }}{{ inp('nik_pasangan', 'NIK pasangan', extra='maxlength=16') }}
+  </div></div>
+  <div class="card mb-3"><div class="card-header">Data kendaraan</div><div class="card-body row g-3">
+    {{ inp('dealer', 'Dealer') }}{{ inp('merk', 'Merk', col=3) }}{{ inp('model', 'Model', col=3) }}
+    {{ inp('tipe', 'Tipe', col=4) }}{{ inp('warna', 'Warna', col=4) }}{{ inp('harga', 'Harga (Rp)', 'number', 4, 'min=0') }}
+  </div></div>
+  <div class="card mb-3"><div class="card-header">Data pinjaman</div><div class="card-body row g-3">
+    <div class="col-md-4"><label class="form-label">Asuransi</label>
+      <select class="form-select" name="asuransi">
+        {% for s in ('All risk', 'TLO', 'Kombinasi') %}<option {{ 'selected' if f.get('asuransi') == s }}>{{ s }}</option>{% endfor %}
+      </select></div>
+    {{ inp('dp', 'Down payment (Rp)', 'number', 4, 'min=0') }}
+    <div class="col-md-4"><label class="form-label">Lama kredit</label>
+      <select class="form-select" name="tenor">
+        {% for t in (12, 24, 36, 48) %}<option value="{{ t }}" {{ 'selected' if f.get('tenor') == t | string }}>{{ t }} bulan</option>{% endfor %}
+      </select></div>
+    <div class="col-12 small text-muted">Angsuran per bulan dihitung otomatis oleh sistem (bunga flat 10% per tahun).</div>
+  </div></div>
+  <div class="card mb-3"><div class="card-header">Dokumen (PDF/JPG/PNG, total maks. 4 MB per pengajuan)</div><div class="card-body row g-3">
+    {{ inp('ktp', 'KTP', 'file') }}{{ inp('tanda_jadi', 'Bukti bayar tanda jadi', 'file') }}
+    {{ inp('form_aplikasi', 'Form aplikasi pengajuan', 'file') }}{{ inp('kk', 'Kartu keluarga', 'file') }}
+  </div></div>
+  <button class="btn btn-primary">Kirim pengajuan</button>
+  <a class="btn btn-outline-secondary" href="{{ url_for('index') }}">Batal</a>
+</form>
+{% endblock %}

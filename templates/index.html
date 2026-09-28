@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Daftar pengajuan{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 m-0">Daftar pengajuan</h1>
+  {% if current_user.role in ('dealer', 'marketing') %}
+  <a class="btn btn-primary" href="{{ url_for('baru') }}">Buat pengajuan</a>{% endif %}
+</div>
+<div class="row g-2 mb-3">
+  {% for s in STATUS %}
+  <div class="col-6 col-md-2"><a class="text-decoration-none" href="{{ url_for('index', status=s) }}">
+    <div class="card text-center {{ 'border-primary' if aktif == s }}"><div class="card-body py-2">
+      <div class="h4 mb-0">{{ counts.get(s, 0) }}</div><small class="text-muted">{{ s }}</small>
+    </div></div></a></div>
+  {% endfor %}
+</div>
+{% if aktif %}<p class="small">Filter: <b>{{ aktif }}</b> <a href="{{ url_for('index') }}">hapus filter</a></p>{% endif %}
+<div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
+  <thead class="table-light"><tr><th>Kode</th><th>Konsumen</th><th>Kendaraan</th><th class="text-end">Angsuran</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for p in rows %}
+  <tr><td>{{ p.kode }}</td><td>{{ p.nama }}</td><td>{{ p.merk }} {{ p.model }}</td>
+    <td class="text-end">{{ p.angsuran | rp }}</td>
+    <td><span class="badge {{ 'bg-danger' if p.status == 'Ditolak' else 'bg-primary' }}">{{ p.status }}</span></td>
+    <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('detail', id=p.id) }}">Detail</a></td></tr>
+  {% else %}
+  <tr><td colspan="6" class="text-center text-muted py-4">Belum ada pengajuan.</td></tr>
+  {% endfor %}
+  </tbody></table></div></div>
+{% endblock %}

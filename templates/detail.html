@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}{{ p.kode }}{% endblock %}
+{% block content %}
+{% set alur = ['Diajukan', 'Disetujui', 'Dokumen dicetak', 'Sudah TTD', 'Dicairkan'] %}
+{% set opsi = TRANSISI.get(current_user.role, {}).get(p.status, []) %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h1 class="h4 m-0">{{ p.kode }} - {{ p.nama }}</h1>
+  <span class="badge fs-6 {{ 'bg-danger' if p.status == 'Ditolak' else 'bg-primary' }}">{{ p.status }}</span>
+</div>
+<ol class="steps mb-4">
+  {% for s in alur %}<li class="{{ 'done' if p.status in alur and alur.index(s) <= alur.index(p.status) }}">{{ s }}</li>{% endfor %}
+</ol>
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card mb-3"><div class="card-header">Data pengajuan</div>
+      <table class="table table-sm mb-0"><tbody>
+        {% for k, v in [('NIK', p.nik), ('Tanggal lahir', p.tgl_lahir.strftime('%d/%m/%Y')),
+          ('Status perkawinan', p.status_kawin), ('Pasangan', (p.nama_pasangan or '-') ~ (' (' ~ p.nik_pasangan ~ ')' if p.nik_pasangan else '')),
+          ('Dealer', p.dealer), ('Kendaraan', p.merk ~ ' ' ~ p.model ~ ' ' ~ (p.tipe or '') ~ ', ' ~ (p.warna or '-')),
+          ('Harga', p.harga | rp), ('Down payment', p.dp | rp), ('Lama kredit', p.tenor ~ ' bulan'),
+          ('Angsuran per bulan', p.angsuran | rp), ('Asuransi', p.asuransi)] %}
+        <tr><th class="w-50 fw-normal text-muted">{{ k }}</th><td>{{ v }}</td></tr>{% endfor %}
+      </tbody></table></div>
+    <div class="card"><div class="card-header">Dokumen</div>
+      <ul class="list-group list-group-flush">
+        {% for d in p.dokumen %}<li class="list-group-item"><a href="{{ url_for('dokumen', id=d.id) }}">{{ JENIS_DOK[d.jenis] }}</a>
+          <small class="text-muted ms-2">{{ d.asli }}</small></li>{% endfor %}
+      </ul></div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card mb-3"><div class="card-header">Tindakan</div><div class="card-body">
+      {% if opsi %}
+      <form method="post" action="{{ url_for('aksi', id=p.id) }}" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if 'Sudah TTD' in opsi %}<label class="form-label">Dokumen TTD digital (PDF/JPG/PNG)</label>
+        <input class="form-control mb-2" type="file" name="ttd" accept=".pdf,.png,.jpg,.jpeg" required>{% endif %}
+        {% if 'Ditolak' in opsi %}<label class="form-label">Catatan (wajib bila ditolak)</label>
+        <textarea class="form-control mb-2" name="catatan" rows="2" maxlength="300"></textarea>{% endif %}
+        {% for o in opsi %}<button name="target" value="{{ o }}" class="btn {{ 'btn-danger' if o == 'Ditolak' else 'btn-primary' }} me-1">{{ LABEL_AKSI[o] }}</button>{% endfor %}
+      </form>
+      {% else %}<p class="text-muted mb-0">Tidak ada tindakan untuk peran Anda pada status ini.</p>{% endif %}
+    </div></div>
+    {% if p.status in ('Dokumen dicetak', 'Sudah TTD', 'Dicairkan') %}
+    <div class="card mb-3"><div class="card-header">Kontrak dan PO</div>
+<pre class="m-0 p-3 small">KONTRAK PEMBIAYAAN {{ p.kode }}
+Konsumen  : {{ p.nama }} (NIK {{ p.nik }})
+Kendaraan : {{ p.merk }} {{ p.model }} {{ p.tipe }} {{ p.warna }}
+Harga/DP  : {{ p.harga | rp }} / {{ p.dp | rp }}
+Tenor     : {{ p.tenor }} bulan, angsuran {{ p.angsuran | rp }}
+Asuransi  : {{ p.asuransi }}
+
+PURCHASE ORDER ke {{ p.dealer }}
+Unit: {{ p.merk }} {{ p.model }} {{ p.tipe }} {{ p.warna }}, harga {{ p.harga | rp }}</pre></div>
+    {% endif %}
+    <div class="card"><div class="card-header">Riwayat</div>
+      <ul class="list-group list-group-flush">
+        {% for r in p.riwayat %}<li class="list-group-item small"><b>{{ r.status }}</b> oleh {{ r.user.nama }}<br>
+          <span class="text-muted">{{ r.waktu.strftime('%d/%m/%Y %H:%M') }}</span>{% if r.catatan %}<br>{{ r.catatan }}{% endif %}</li>{% endfor %}
+      </ul></div>
+  </div>
+</div>
+<div class="d-flex gap-2 mt-3">
+  <a class="btn btn-danger" href="{{ url_for('pengajuan_pdf', id=p.id) }}">Cetak / Download PDF</a>
+  <a class="btn btn-link px-0" href="{{ url_for('index') }}">Kembali ke daftar</a>
+</div>
+{% endblock %}

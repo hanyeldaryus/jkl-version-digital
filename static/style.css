@@ -1,0 +1,6 @@
+body{background:#f4f6f9}
+.bg-jkl{background:#0d3b66}
+.steps{display:flex;gap:6px;list-style:none;padding:0;margin:0}
+.steps li{flex:1;text-align:center;font-size:.8rem;padding:6px 4px;border-radius:6px;background:#e3e8ee;color:#5b6b7b}
+.steps li.done{background:#0d6efd;color:#fff}
+.card-header{font-weight:600;background:#fff}

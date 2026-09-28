@@ -1,0 +1,10 @@
+.env
+.env.*
+*.db
+uploads/
+security.log*
+__pycache__/
+.venv/
+app.py.bak
+.git/
+.github/
