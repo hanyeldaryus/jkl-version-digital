@@ -330,7 +330,7 @@ def wajib_login():
 
 @app.after_request
 def jangan_cache(resp):
-    if current_user.is_authenticated:
+    if current_user.is_authenticated or request.path == url_for("login"):
         resp.headers["Cache-Control"] = "no-store"
     return resp
 
