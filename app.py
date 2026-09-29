@@ -33,6 +33,8 @@ from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from flask_wtf.csrf import CSRFError
+
 
 load_dotenv()
 
@@ -46,6 +48,12 @@ def wajib_env(nama):
 
 
 PROD = os.environ.get("APP_ENV") == "production"
+
+
+@app.errorhandler(CSRFError)
+def csrf_error(e):
+    audit("csrf_gagal", alasan=e.description)
+    return f"CSRF: {e.description}", 400
 
 def database_url():
     url = os.environ.get("DATABASE_URL")
@@ -74,7 +82,7 @@ app.config.update(
 if os.environ.get("TRUST_PROXY") == "1":
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 Talisman(app, force_https=PROD, strict_transport_security=PROD, session_cookie_secure=PROD,
-         frame_options="DENY", referrer_policy="no-referrer",
+         frame_options="DENY", referrer_policy="same-origin",
          content_security_policy={"default-src": "'self'",
                                   "style-src": ["'self'", "https://cdn.jsdelivr.net"],
                                   "img-src": ["'self'", "data:"], "frame-ancestors": "'none'"})
